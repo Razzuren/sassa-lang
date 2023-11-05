@@ -32,7 +32,7 @@ class SassaLexer {
 
     //Lexer function that takes a file as input and outputs a file with the tokens
     fun lexer(file : File): Map<String, Any>{
-        file.outputStream().bufferedWriter().use { out ->
+        file.outputStream().bufferedWriter().use {
             return lexer(file.readText())
         }
     }
