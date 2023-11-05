@@ -1,3 +1,10 @@
+/*
+You may wonder why all regex use anchor '^' ,
+this is because the matcher.find() method will match the first occurrence of the regex,
+and we WANT to match the sole occurrence of the regex in the current substring.
+If works, them it's not a workaround.
+*/
+
 package utilities.parsers
 
 import java.io.File
@@ -30,12 +37,14 @@ data class Token(val type: TokenType, val text: String, val line: Int, val colum
 //TODO() Refactor lexemes to be interpreted by it own method
 class SassaLexer {
 
-    //Lexer function that takes a file as input and outputs a file with the tokens
+    //Lexer function that takes a file as input
     fun lexer(file : File): Map<String, Any>{
         file.outputStream().bufferedWriter().use {
             return lexer(file.readText())
         }
     }
+
+
 
     // Lexer function that takes a string as input and outputs a map with the exit code and the tokens
     fun lexer(sourceCode: String): Map<String, Any> {
@@ -47,6 +56,7 @@ class SassaLexer {
         val lines = sourceCode.split("\n")
 
         for (line in lines) {
+
             while (currentIndex < line.length) {
                 // Skip whitespace characters
                 if (line[currentIndex].isWhitespace()) {
