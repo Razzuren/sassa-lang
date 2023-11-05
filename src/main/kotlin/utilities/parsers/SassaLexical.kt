@@ -1,5 +1,6 @@
 package utilities.parsers
 
+import java.io.File
 import java.util.regex.Pattern
 
 // Define token types
@@ -28,7 +29,15 @@ data class Token(val type: TokenType, val text: String, val line: Int, val colum
 //I know this code is ugly as hell, I will refactor in the near future
 //TODO() Refactor lexemes to be interpreted by it own method
 class SassaLexer {
-// Lexer function
+
+    //Lexer function that takes a file as input and outputs a file with the tokens
+    fun lexer(file : File): Map<String, Any>{
+        file.outputStream().bufferedWriter().use { out ->
+            return lexer(file.readText())
+        }
+    }
+
+    // Lexer function that takes a string as input and outputs a map with the exit code and the tokens
     fun lexer(sourceCode: String): Map<String, Any> {
         val tokens = mutableListOf<Token>()
         var currentIndex = 0
