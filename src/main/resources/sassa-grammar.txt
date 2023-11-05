@@ -1,0 +1,92 @@
+SASSA LANGUAGE GRAMMAR
+
+<MAIN>                  := <COMMENT> <FUNCTIONS> <COMMENT> 'main' '{' '/n' ['/t']+' <COMMANDS> '}'
+
+<COMMENT>               := '/*'[<STRING> ∌ '*/'] '*/' 
+                        | ε
+
+<COMMANDS>              := <COMMENT> <COMMAND> '/n' <COMMANDS> 
+                        | <COMMAND> '/n'
+
+<COMMAND>               := <IF> 
+                        | <LOOP> 
+                        | <VARIABLE_DECLARATION> 
+                        | <CUSTOM_FUNCTION> 
+                        | <OUTPUT> 
+                        | <ATTRIBUTION> 
+                        | <RETURN>
+
+<IF>                    := 'if' '(' <CONDITION> ')' '{' '/n' ['/t']+ <COMMANDS> '}' <ELSE>
+
+<ELSE>                  := 'else' '{' '/n' ['/t']+ <COMMANDS> '}'
+                        | ε
+
+<LOOP>                  := 'loop' '(' [<CONDITION> | <FOR_CONDITION> |  ε ] ')' '{' '/n' ['/t']+ <COMMANDS> '}'
+
+<ATTRIBUTION>           := <IDENTIFIER> '=' <EXPRESSION>
+
+<OUTPUT>                := 'out' '(' <EXPRESSION> ')'
+
+<RETURN>                := 'return' <EXPRESSION>
+
+<VARIABLE_DECLARATION>  := <TYPE> <ATTRIBUTION>
+
+<FUNCTIONS>             := <COMMENT> <FUNCTION> <FUNCTIONS>
+                        | ε
+
+<FUNCTION>              := <TYPE> <IDENTIFIER> '(' <HEADER> ')' '{' '/n' ['/t']+ <COMMANDS> '}'
+
+<HEADER>                := <TYPE> <IDENTIFIER> 
+                        | <TYPE> <IDENTIFIER> ',' [<HEADER> ∌ ε] 
+                        |  ε 
+
+<CUSTOM_FUNCTION>       := <IDENTIFIER> '(' <ARGUMENTS> ')'
+
+<ARGUMENTS>             := <EXPRESSION> 
+                        | <EXPRESSION> ','  [<ARGUMENTS> ∌ ε] 
+                        |  ε
+
+<CONDITION>             := <EXPRESSION> '==' <EXPRESSION> 
+                        | <EXPRESSION> '!=' <EXPRESSION> 
+                        | <EXPRESSION> '>=' <EXPRESSION> 
+                        | <EXPRESSION> '<=' <EXPRESSION> 
+                        | <EXPRESSION> '<' <EXPRESSION> 
+                        | <EXPRESSION> '>' <EXPRESSION> 
+                        | <EXPRESSION> '&&' <EXPRESSION> 
+                        | <EXPRESSION> '||' <EXPRESSION> 
+                        | <EXPRESSION> '^' <EXPRESSION>
+
+<FOR_CONDITION>         := [<IDENTIFIER> | <VARIABLE_DECLARATION>] '..' <EXPRESSION>
+
+<INPUT>                 := 'in' '(' <STRING> ')'
+
+<TYPE>                  := 'num' 
+                        | 'str' 
+                        | 'bool' 
+                        | 'any'
+
+<STRING>                := ''' [ a-z A-Z 0-9 @#%¨&*(}="-_[]`^:<>*,"]* '''
+
+<NUMBER>                := [0-9]+ ['.'[0-9]+ | ε ]
+
+<IDENTIFIER>            := [a-z]+ [a-z A-Z 0-9]* ∌ Λ 
+
+<EXPRESSION>            := <EXPRESSION> '+' <TERM> 
+                        | <EXPRESSION> '-' <TERM> 
+                        | <TERM>
+
+<TERM>                  := <TERM> '*' <FACTOR> 
+                        | <TERM> '/' <FACTOR> 
+                        | <TERM> '%' <FACTOR> 
+                        | <FACTOR>
+
+<FACTOR>                := '-'<FACTOR> 
+                        | '!'<FACTOR> 
+                        | <VALUE>
+
+<VALUE>                 := '(' <EXPRESSION> ')' 
+                        | <NUMBER> 
+                        | <STRING> 
+                        | <CUSTOM_FUNCTION> 
+                        | <IDENTIFIER> 
+                        | <INPUT>
