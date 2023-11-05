@@ -25,6 +25,8 @@ sealed class TokenType {
 // Define the utilities.parsers.Token class with line and column information
 data class Token(val type: TokenType, val text: String, val line: Int, val column: Int)
 
+//I know this code is ugly as hell, I will refactor in the near future
+//TODO() Refactor lexemes to be interpreted by it own method
 class SassaLexer {
 // Lexer function
     fun lexer(sourceCode: String): Map<String, Any> {
