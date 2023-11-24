@@ -27,6 +27,8 @@ sealed class TokenType {
     object OpenParenthesis : TokenType()
     object CloseParenthesis : TokenType()
     object ForCondition : TokenType()
+    object Comma : TokenType()
+    object NewLine : TokenType()
     object Invalid : TokenType()
 }
 
@@ -40,14 +42,12 @@ class SassaLexer {
     //Lexer function that takes a file as input
     fun lexer(file : File): Map<String, Any>{
         file.outputStream().bufferedWriter().use {
-            return lexer(file.readText())
+            return lexer(file.readText(),false)
         }
     }
 
-
-
     // Lexer function that takes a string as input and outputs a map with the exit code and the tokens
-    fun lexer(sourceCode: String): Map<String, Any> {
+    fun lexer(sourceCode: String, debug: Boolean): Map<String, Any> {
         val tokens = mutableListOf<Token>()
         var currentIndex = 0
         var exitCode = 0
@@ -64,7 +64,7 @@ class SassaLexer {
                     continue
                 }
 
-                println(line.substring(currentIndex))
+                if (debug) println(line.substring(currentIndex))
 
                 // Try to match a comment
                 val commentPattern = Pattern.compile("\\/\\*.*?\\*\\/")
@@ -129,7 +129,7 @@ class SassaLexer {
                 }
 
                 // Try to match a numerical operator
-                val numericOperatorPattern = Pattern.compile("^[+\\-*/]")
+                val numericOperatorPattern = Pattern.compile("^[+\\-*/%]")
                 val numericOperatorMatcher = numericOperatorPattern.matcher(line.substring(currentIndex))
                 if (numericOperatorMatcher.find()) {
                     val operator = numericOperatorMatcher.group()
@@ -158,9 +158,16 @@ class SassaLexer {
                     continue
                 }
 
-                // Try to match an open curly brace
+                // Try to match an equal
                 if (line[currentIndex] == '=') {
                     tokens.add(Token(TokenType.Equals, "=", currentLine, currentIndex))
+                    currentIndex ++
+                    continue
+                }
+
+                // Try to match an equal
+                if (line[currentIndex] == ',') {
+                    tokens.add(Token(TokenType.Comma, ",", currentLine, currentIndex))
                     currentIndex ++
                     continue
                 }
@@ -209,7 +216,7 @@ class SassaLexer {
                 currentIndex++
                 exitCode++
             }
-
+            tokens.add(Token(TokenType.NewLine, "\\n", currentLine, currentIndex))
             currentIndex = 0
             currentLine++
         }

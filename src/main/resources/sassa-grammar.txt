@@ -1,6 +1,8 @@
 SASSA LANGUAGE GRAMMAR
 
-<MAIN>                  := <COMMENT> <FUNCTIONS> <COMMENT> 'main' '{' '/n' ['/t']+' <COMMANDS> '}'
+<MAIN>                  := <COMMENT> <FUNCTIONS> <COMMENT> 'main' <BLOCK>
+
+<BLOCK>                 :=  '{' '/n' ['/t']+' <COMMANDS> '}'
 
 <COMMENT>               := '/*'[<STRING> ∌ '*/'] '*/' 
                         | ε
@@ -16,12 +18,12 @@ SASSA LANGUAGE GRAMMAR
                         | <ATTRIBUTION> 
                         | <RETURN>
 
-<IF>                    := 'if' '(' <CONDITION> ')' '{' '/n' ['/t']+ <COMMANDS> '}' <ELSE>
+<IF>                    := 'if' '(' <CONDITION> ')' <BLOCK> <ELSE>
 
-<ELSE>                  := 'else' '{' '/n' ['/t']+ <COMMANDS> '}'
+<ELSE>                  := 'else' <BLOCK>
                         | ε
 
-<LOOP>                  := 'loop' '(' [<CONDITION> | <FOR_CONDITION> |  ε ] ')' '{' '/n' ['/t']+ <COMMANDS> '}'
+<LOOP>                  := 'loop' '(' [<CONDITION> | <FOR_CONDITION> |  ε ] ')' <BLOCK>
 
 <ATTRIBUTION>           := <IDENTIFIER> '=' <EXPRESSION>
 
@@ -34,7 +36,7 @@ SASSA LANGUAGE GRAMMAR
 <FUNCTIONS>             := <COMMENT> <FUNCTION> <FUNCTIONS>
                         | ε
 
-<FUNCTION>              := <TYPE> <IDENTIFIER> '(' <HEADER> ')' '{' '/n' ['/t']+ <COMMANDS> '}'
+<FUNCTION>              := <TYPE> <IDENTIFIER> '(' <HEADER> ')' <BLOCK>
 
 <HEADER>                := <TYPE> <IDENTIFIER> 
                         | <TYPE> <IDENTIFIER> ',' [<HEADER> ∌ ε] 
