@@ -36,7 +36,7 @@ class SassaParser(val debug: Boolean){
             resultMap["exitcode"] = 0
             resultMap["parsed_statements"] = statements
         } catch (e: Exception) {
-            println(e.message)
+            throw e
             resultMap["exitcode"] = 1
             resultMap["parsed_statements"] = e.message ?: "Parsing error"
         }
@@ -153,6 +153,7 @@ class SassaParser(val debug: Boolean){
         //todo() parseElseStatement()
     }
 
+    //TODO() this is obviously wrong
     private fun parseExpression() {
         if (match(TokenType.Identifier)) {
         } else {
