@@ -7,8 +7,8 @@ SASSA LANGUAGE GRAMMAR
 <COMMENT>               := '/*'[<STRING> ∌ '*/'] '*/' 
                         | ε
 
-<COMMANDS>              := <COMMENT> <COMMAND> '/n' <COMMANDS> 
-                        | <COMMAND> '/n'
+<COMMANDS>              := <COMMENT> <COMMAND> <COMMENT> '/n' <COMMANDS>
+                        | ε
 
 <COMMAND>               := <IF> 
                         | <LOOP> 
@@ -58,13 +58,13 @@ SASSA LANGUAGE GRAMMAR
                         | <EXPRESSION> '||' <EXPRESSION> 
                         | <EXPRESSION> '^' <EXPRESSION>
 
-<FOR_CONDITION>         := [<IDENTIFIER> | <VARIABLE_DECLARATION>] '..' <EXPRESSION>
+<FOR_CONDITION>         := [<IDENTIFIER> | <VARIABLE_DECLARATION>] '..' <EXPRESSION> [ ':' <EXPRESSION> | ε ]
 
 <INPUT>                 := 'in' '(' <STRING> ')'
 
-<TYPE>                  := 'num' 
-                        | 'str' 
-                        | 'bool' 
+<TYPE>                  := 'num'
+                        | 'str'
+                        | 'bool'
                         | 'any'
 
 <STRING>                := ''' [ a-z A-Z 0-9 @#%¨&*(}="-_[]`^:<>*,"]* '''

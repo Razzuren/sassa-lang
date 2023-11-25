@@ -1,32 +1,27 @@
 package utilities.parsers
 
-data class Statement(val tokens: List<Token>, val statementType: StatementType, val children: List<Statement>)
+data class Statement(val tokens: List<Token>, val statementType: StatementType)
 
 sealed class StatementType {
     object Main : StatementType()
     object If : StatementType()
     object Else : StatementType()
     object Loop : StatementType()
-    object Condition : StatementType()
-    object ForCondition : StatementType()
     object Out : StatementType()
     object In : StatementType()
     object Return : StatementType()
     object VariableDeclaration : StatementType()
     object Assignment : StatementType()
-    object Expression : StatementType()
     object Block : StatementType()
     object FunctionDeclaration : StatementType()
     object Call : StatementType()
-    object Parameter : StatementType()
+    object Invalid : StatementType()
 }
 
-class SassaParser(val debug: Boolean){
+class SassaParser(private val debug: Boolean){
     private var currentIndex = 0
-    private var currentLine = 0
     private lateinit var tokens: List<Token>
     private var statements = mutableListOf<Statement>()
-    private lateinit var auxToken: Token
 
     fun parse(tokens: List<Token>): Map<String, Any> {
         this.tokens = tokens
@@ -36,19 +31,23 @@ class SassaParser(val debug: Boolean){
             resultMap["exitcode"] = 0
             resultMap["parsed_statements"] = statements
         } catch (e: Exception) {
-            throw e
             resultMap["exitcode"] = 1
-            resultMap["parsed_statements"] = e.message ?: "Parsing error"
+            resultMap["parsed_statements"] = listOf(
+                Statement(listOf(Token(TokenType.String,e.message!!,0,0)),
+                StatementType.Invalid))
+        } finally {
+            //Should it here? No. Will it stay here? ATM yes.
+            return resultMap
         }
-        return resultMap
     }
 
     //<MAIN> := <COMMENT> <FUNCTIONS> <COMMENT> 'main' <BLOCK>
     private fun parseMain() {
        while (match(TokenType.Comment) || match(TokenType.NewLine)) advance()
+        val auxIndex = currentIndex
         parseFunctions()
         consume(TokenType.Keyword, "Expected 'main'")
-        statements.add(Statement(listOf(getCurrentToken()), StatementType.Main, listOf()))
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Main))
         parseBlock()
     }
 
@@ -69,11 +68,11 @@ class SassaParser(val debug: Boolean){
         consume(TokenType.OpenParenthesis, "Expected '('")
         parseHeader()
         consume(TokenType.CloseParenthesis, "Expected ')'")
-        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.FunctionDeclaration, listOf()))
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.FunctionDeclaration))
         parseBlock()
     }
 
-    //<HEADER> := <TYPE> <IDENTIFIER> | <TYPE> <IDENTIFIER> ',' [<HEADER> ∌ ε] |  ε
+    //<HEADER> := <TYPE> <IDENTIFIER> | <TYPE> <IDENTIFIER> ',' [<HEADER> not empty] |  empty
     private fun parseHeader() {
         parseType()
         parseIdentifier()
@@ -101,26 +100,29 @@ class SassaParser(val debug: Boolean){
     //<BLOCK> := '{' <COMMANDS> '}'
     private fun parseBlock() {
         val firstBracket = currentIndex
-        val currentStatement = if (statements.isNotEmpty()) statements.size - 1 else 0
+        val currentStatement = if (statements.isNotEmpty()) statements.size else 1
         consume(TokenType.OpenBrace, "Expected '{' at the beginning of a block")
         while (!match(TokenType.CloseBrace)) {
             parseCommands()
         }
         val secondBracket = currentIndex
         consume(TokenType.CloseBrace, "Expected '}' at the end of a block")
-        val statement = Statement(tokens.subList(firstBracket, secondBracket), StatementType.Block,
-            statements.subList(currentStatement, statements.size))
         //Insert the block statement on the right place
-        statements.add(currentStatement,statement)
+        statements.add(currentStatement,Statement(tokens.subList(firstBracket, secondBracket), StatementType.Block))
     }
 
-    //<COMMENT> <COMMAND> '/n' <COMMANDS> | <COMMAND> '/n'
+    //<COMANDS> :=<COMMENT> <COMMAND> <COMMENT> '/n' <COMMANDS> | empty
     private fun parseCommands() {
-        while (match(TokenType.Comment)) advance()
+        while (match(TokenType.Comment) || match(TokenType.NewLine)) advance()
         parseCommand()
-        if (match(TokenType.NewLine)) {
+        while (match(TokenType.Comment)) advance()
+        //if there is a new line, parse the next command
+        if (!match(TokenType.NewLine)) {
             consume(TokenType.NewLine, "Expected new line")
-            parseCommands()
+        }
+        while(match(TokenType.NewLine)){
+            consume(TokenType.NewLine, "Expected new line")
+            parseCommand()
         }
     }
 
@@ -129,15 +131,112 @@ class SassaParser(val debug: Boolean){
         if (match(TokenType.Keyword)) {
             when (getCurrentToken().text) {
                 "if" -> parseIfStatement()
-                //todo()"loop" -> parseLoopStatement()
-                //todo()  "out" -> parseOutStatement()
-                //todo()  "in" -> parseInStatement()
-                //todo()  "return" -> parseReturnStatement()
+                "loop" -> parseLoopStatement()
+                "out" -> parseOutStatement()
+                "in" -> parseInputStatement()
+                "return" -> parseReturnStatement()
             }
         } else if (match(TokenType.Type)) {
-            //todo()parseVariableDeclaration()
+            parseVariableDeclaration()
         } else if (match(TokenType.Identifier)) {
-            //todo()  parseAssignmentOrCustomFunction()
+            parseAttributionOrFunctionCall()
+        } else if (match(TokenType.Comment)) advance()
+    }
+
+    //<RETURN> := 'return' <EXPRESSION>
+    private fun parseReturnStatement() {
+        val auxIndex = currentIndex
+        consume(TokenType.Keyword, "Expected 'return'")
+        parseExpression()
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Return))
+    }
+
+    //<loop> = 'loop' '(' [<CONDITION> | <FOR_CONDITION> |  empty ] ')' <BLOCK>
+    private fun parseLoopStatement() {
+        val auxIndex = currentIndex
+        consume(TokenType.Keyword, "Expected 'loop'")
+        consume(TokenType.OpenParenthesis, "Expected '('")
+        if (match(TokenType.Type)) {
+            parseForCondition()
+        } else if (match(TokenType.Identifier)) {
+            try {
+                if (tokens[currentIndex + 1].type == TokenType.ForCondition) {
+                    parseForCondition()
+                } else {
+                    parseCondition()
+                }
+            } catch (e: Exception) {
+                throw e
+            }
+        } else if (match(TokenType.LogicalOperator)) {
+            parseCondition()
+        }
+        consume(TokenType.CloseParenthesis, "Expected ')'")
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Loop))
+        parseBlock()
+    }
+
+    //<FOR_CONDITION := [<IDENTIFIER> | <VARIABLE_DECLARATION>] '..' <EXPRESSION> [ ':' <EXPRESSION> | empty ]
+    private fun parseForCondition() {
+        if (match(TokenType.Type)) {
+            parseType()
+            parseIdentifier()
+            consume(TokenType.Equals, "Expected '='")
+            parseExpression()
+        } else {
+            parseIdentifier()
+        }
+        consume(TokenType.ForCondition, "Expected '..'")
+        parseExpression()
+        if (match(TokenType.ForStep)) {
+            consume(TokenType.ForStep, "Expected ':'")
+            parseExpression()
+        }
+    }
+
+    //<OUTPUT> := 'out' '(' <EXPRESSION> ')'
+    private fun parseOutStatement() {
+        val auxIndex = currentIndex
+        consume(TokenType.Keyword, "Expected 'out'")
+        consume(TokenType.OpenParenthesis, "Expected '('")
+        parseExpression()
+        consume(TokenType.CloseParenthesis, "Expected ')'")
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Out))
+    }
+
+    //<VARIABLE_DECLARATION> := <TYPE> <IDENTIFIER> '=' <EXPRESSION>
+    private fun parseVariableDeclaration() {
+        val auxIndex = currentIndex
+        parseType()
+        parseIdentifier()
+        consume(TokenType.Equals, "Expected '='")
+        parseExpression()
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.VariableDeclaration))
+    }
+
+    //<ATTRIBUTION> := <IDENTIFIER> '=' <EXPRESSION>
+    //<CUSTOM_FUNCTION> := <IDENTIFIER> '(' <ARGUMENTS> ')'
+    private fun parseAttributionOrFunctionCall() {
+        val auxIndex = currentIndex
+        parseIdentifier()
+        if (match(TokenType.Equals)) {
+            consume(TokenType.Equals, "Expected '='")
+            parseExpression()
+            statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Assignment))
+        } else {
+            consume(TokenType.OpenParenthesis, "Expected '('")
+            parseArguments()
+            consume(TokenType.CloseParenthesis, "Expected ')'")
+            statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Call))
+        }
+    }
+
+    //<ARGUMENTS> := <EXPRESSION> | <EXPRESSION> ',' <ARGUMENTS>
+    private fun parseArguments() {
+        parseExpression()
+        while (match(TokenType.Comma)) {
+            consume(TokenType.Comma, "Expected ','")
+            parseExpression()
         }
     }
 
@@ -146,25 +245,95 @@ class SassaParser(val debug: Boolean){
         val auxIndex = currentIndex
         consume(TokenType.Keyword, "Expected 'if'")
         consume(TokenType.OpenParenthesis, "Expected '('")
-        //todo() parseCondition()
+        parseCondition()
         consume(TokenType.CloseParenthesis, "Expected ')'")
-        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.If, listOf()))
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.If))
         parseBlock()
-        //todo() parseElseStatement()
+        parseElseStatement()
     }
 
-    //TODO() this is obviously wrong
-    private fun parseExpression() {
-        if (match(TokenType.Identifier)) {
-        } else {
-            throw ParseException("Expected identifier in expression")
+    //<ELSE> := 'else' <BLOCK>
+    private fun parseElseStatement() {
+        if (match(TokenType.Keyword) && getCurrentToken().text == "else") {
+            val auxIndex = currentIndex
+            consume(TokenType.Keyword, "Expected 'else'")
+            statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Else))
+            parseBlock()
         }
+    }
+
+    //<CONDITION>   '==' | '!=' | '>=' |'<=' | '<'  | '>'  | '&&' |  '||' |  '^'  between <EXPRESSION> and <EXPRESSION>
+    private fun parseCondition() {
+        parseExpression()
+        consume(TokenType.LogicalOperator, "Expected logical operator")
+        parseExpression()
+    }
+
+    //<EXPRESSION> := <EXPRESSION> '+' <TERM> | <EXPRESSION> '-' <TERM> | <TERM>
+    private fun parseExpression() {
+        parseTerm()
+        while (match(TokenType.NumericalOperator)) {
+            consume(TokenType.NumericalOperator, "Expected numerical operator")
+            parseTerm()
+        }
+    }
+
+    //<TERM> := <TERM> '*' <FACTOR> | <TERM> '/' <FACTOR> | <TERM> '%' <FACTOR> | <FACTOR>
+    private fun parseTerm() {
+        parseFactor()
+        while (match(TokenType.NumericalOperator)) {
+            consume(TokenType.NumericalOperator, "Expected numerical operator")
+            parseFactor()
+        }
+    }
+
+    //<FACTOR>   := '-'<FACTOR> | '!'<FACTOR> | <VALUE>
+    private fun parseFactor() {
+        if (match(TokenType.NumericalOperator)) {
+            consume(TokenType.NumericalOperator, "Expected numerical operator")
+            parseFactor()
+        } else if (match(TokenType.LogicalOperator)) {
+            consume(TokenType.LogicalOperator, "Expected logical operator")
+            parseFactor()
+        } else {
+            parseValue()
+        }
+    }
+
+    //<VALUE> := <NUMBER> | <STRING> | <BOOLEAN> | <IDENTIFIER> | <CUSTOM_FUNCTION> | <INPUT> | '(' <EXPRESSION> ')'
+    private fun parseValue() {
+        if (match(TokenType.Number)) {
+            consume(TokenType.Number, "Expected number")
+        } else if (match(TokenType.String)) {
+            consume(TokenType.String, "Expected string")
+        } else if (match(TokenType.Boolean)) {
+            consume(TokenType.Boolean, "Expected boolean")
+        } else if (match(TokenType.Identifier)) {
+            parseIdentifier()
+        } else if (match(TokenType.Keyword) && getCurrentToken().text == "in") {
+            parseInputStatement()
+        }
+        else {
+            consume(TokenType.OpenParenthesis, "Expected '('")
+            parseExpression()
+            consume(TokenType.CloseParenthesis, "Expected ')'")
+        }
+    }
+
+    //<INPUT> :=  'in' '(' <STRING> ')'
+    private fun parseInputStatement() {
+        val auxIndex = currentIndex
+        consume(TokenType.Keyword, "Expected 'in'")
+        consume(TokenType.OpenParenthesis, "Expected '('")
+        consume(TokenType.String, "Expected string")
+        consume(TokenType.CloseParenthesis, "Expected ')'")
+        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.In))
     }
 
     private fun consume(type: TokenType, errorMessage: String) {
         if (match(type)) {
             advance()
-            println("now consuming: $type")
+            if (debug) println("now consuming: $type")
         } else {
             throw ParseException("On line " + getCurrentToken().line + ", Column "
                     + getCurrentToken().column + " "

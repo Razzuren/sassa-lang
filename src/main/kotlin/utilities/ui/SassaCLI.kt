@@ -1,13 +1,11 @@
 package utilities.ui
 
-import utilities.parsers.SassaLexer
-import utilities.parsers.SassaParser
-import utilities.parsers.Token
-import utilities.parsers.TokenType
+import utilities.parsers.*
 import java.io.File
 
 const val red = "\u001b[31m"
 const val reset = "\u001b[0m"
+const val debug = false
 
 fun main(args: Array<String>) {
     when {
@@ -18,7 +16,7 @@ fun main(args: Array<String>) {
             println("2. Enter your own string input")
             println("3. Enter a file location to parse")
             print("Enter the option number: ")
-            val option = readLine()
+            val option = readlnOrNull()
 
             when (option) {
                 "1" -> testPredefinedString()
@@ -53,17 +51,19 @@ fun main(args: Array<String>) {
 
 
 private fun parseAndDisplayTokens(sourceCode: String) {
-    val lexerResult = SassaLexer().lexer(sourceCode, false)
+    val lexerResult = SassaLexer(debug).lexer(sourceCode)
 
     val exitCode = lexerResult["exitcode"] as Int
     val tokens = lexerResult["tokens"] as List<Token>
 
-    for (token in tokens) {
-        println("Token Type: ${token.type::class.simpleName}, " +
-                "Text: '${token.text}', Line: ${token.line}, Column: ${token.column}")
-    }
+    println("Lexer finished with Exit Code: $exitCode")
 
-    println("Exit Code: $exitCode")
+    tokens.forEach {
+        println(
+            "Token Type: ${it.type::class.simpleName}, " +
+                    "Text: '${it.text}', Line: ${it.line}, Column: ${it.column}"
+        )
+    }
 
     if (exitCode > 0) {
         println("Invalid Tokens:")
@@ -76,32 +76,51 @@ private fun parseAndDisplayTokens(sourceCode: String) {
     }
 
     // Parse the tokens
-    val parser = SassaParser(true)
+    val parser = SassaParser(debug)
     val parserResult = parser.parse(tokens)
 
     // Display parsing result
     val parserExitCode = parserResult["exitcode"] as Int
-    val parsedStatements = parserResult["parsed_statements"]
+    val parsedStatements = parserResult["parsed_statements"] as List<Statement>
 
     println("\nParser Exit Code: $parserExitCode")
-    println("Parsed Statements:$parsedStatements")
+
+    if (parserExitCode > 0) {
+        parsedStatements.forEach { println(red + it.tokens[0].text + reset) }
+
+    } else {
+        println("Parsed Statements:")
+        parsedStatements.forEach { i ->
+            println("------------------")
+            println(i.statementType)
+            i.tokens.forEach { j ->
+                println(
+                    "Token Type: ${j.type::class.simpleName}, " +
+                            "Text: '${j.text}', Line: ${j.line}, Column: ${j.column}"
+                )
+            }
+            println("")
+
+        }
+    }
 }
 
 private fun testPredefinedString() {
-    //we expect two errors, one lost ' and ?
     val sourceCode = """
         /* this is a comment */
         str test(str argument, num argument2){
-            out(argument)
+            out(argument) /* this is a comment */
             out(argument2)
+            return 'hello'
         }
         
         main {
+            num x = 5
             if (x == 5) {
-                num y = 7.2 % 2 
+                num y = 7.2 % 2
             } else {
                 loop ( num z = 0 .. 9) {
-                    str y = 'its dangerous'
+                    /*this is also a comment*/ str y = 'its dangerous'
                     test( y , z)
                 }
             }
@@ -112,7 +131,7 @@ private fun testPredefinedString() {
 
 private fun parseUserStringInput() {
     print("Enter your own string input: ")
-    val sourceCode = readLine()
+    val sourceCode = readlnOrNull()
     if (sourceCode != null) {
         parseAndDisplayTokens(sourceCode)
     }
@@ -120,9 +139,9 @@ private fun parseUserStringInput() {
 
 private fun parseFileInput() {
     print("Enter the file location to parse: ")
-    val filePath = readLine()
-    if (File(filePath).isFile) {
-        val sourceCode = File(filePath).readText()
+    val filePath = readlnOrNull()
+    if (File(filePath!!).isFile) {
+        val sourceCode = File(filePath!!).readText()
         parseAndDisplayTokens(sourceCode)
     } else {
         println("File not found: $filePath")
