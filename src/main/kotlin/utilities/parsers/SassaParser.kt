@@ -133,8 +133,10 @@ class SassaParser(private val debug: Boolean){
                 "if" -> parseIfStatement()
                 "loop" -> parseLoopStatement()
                 "out" -> parseOutStatement()
-                "in" -> parseInputStatement()
                 "return" -> parseReturnStatement()
+                else ->  throw ParseException("On line " + getCurrentToken().line + ", Column "
+                        + getCurrentToken().column + " "
+                        + "found invalid keyword: " + getCurrentToken().text)
             }
         } else if (match(TokenType.Type)) {
             parseVariableDeclaration()
@@ -218,17 +220,28 @@ class SassaParser(private val debug: Boolean){
     //<CUSTOM_FUNCTION> := <IDENTIFIER> '(' <ARGUMENTS> ')'
     private fun parseAttributionOrFunctionCall() {
         val auxIndex = currentIndex
+        val currentStatement = if (statements.isNotEmpty()) statements.size else 1
         parseIdentifier()
         if (match(TokenType.Equals)) {
             consume(TokenType.Equals, "Expected '='")
             parseExpression()
-            statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Assignment))
+            statements.add(currentStatement,Statement(tokens.subList(auxIndex, currentIndex), StatementType.Assignment))
         } else {
             consume(TokenType.OpenParenthesis, "Expected '('")
             parseArguments()
             consume(TokenType.CloseParenthesis, "Expected ')'")
-            statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.Call))
+            statements.add(currentStatement,Statement(tokens.subList(auxIndex, currentIndex), StatementType.Call))
         }
+    }
+
+    //<CUSTOM_FUNCTION> := <IDENTIFIER> '(' <ARGUMENTS> ')'
+    private fun parseFunctionCall() {
+        val auxIndex = currentIndex
+        val currentStatement = if (statements.isNotEmpty()) statements.size else 1
+        parseIdentifier()
+        consume(TokenType.OpenParenthesis, "Expected '('")
+        parseArguments()
+        consume(TokenType.CloseParenthesis, "Expected ')'")
     }
 
     //<ARGUMENTS> := <EXPRESSION> | <EXPRESSION> ',' <ARGUMENTS>
@@ -265,8 +278,10 @@ class SassaParser(private val debug: Boolean){
     //<CONDITION>   '==' | '!=' | '>=' |'<=' | '<'  | '>'  | '&&' |  '||' |  '^'  between <EXPRESSION> and <EXPRESSION>
     private fun parseCondition() {
         parseExpression()
-        consume(TokenType.LogicalOperator, "Expected logical operator")
-        parseExpression()
+        while (match(TokenType.LogicalOperator)) {
+            consume(TokenType.LogicalOperator, "Expected logical operator")
+            parseExpression()
+        }
     }
 
     //<EXPRESSION> := <EXPRESSION> '+' <TERM> | <EXPRESSION> '-' <TERM> | <TERM>
@@ -309,7 +324,8 @@ class SassaParser(private val debug: Boolean){
         } else if (match(TokenType.Boolean)) {
             consume(TokenType.Boolean, "Expected boolean")
         } else if (match(TokenType.Identifier)) {
-            parseIdentifier()
+            if (tokens[currentIndex + 1].type == TokenType.OpenParenthesis) parseFunctionCall()
+            else parseIdentifier()
         } else if (match(TokenType.Keyword) && getCurrentToken().text == "in") {
             parseInputStatement()
         }
@@ -322,18 +338,16 @@ class SassaParser(private val debug: Boolean){
 
     //<INPUT> :=  'in' '(' <STRING> ')'
     private fun parseInputStatement() {
-        val auxIndex = currentIndex
         consume(TokenType.Keyword, "Expected 'in'")
         consume(TokenType.OpenParenthesis, "Expected '('")
-        consume(TokenType.String, "Expected string")
+        parseExpression()
         consume(TokenType.CloseParenthesis, "Expected ')'")
-        statements.add(Statement(tokens.subList(auxIndex, currentIndex), StatementType.In))
     }
 
     private fun consume(type: TokenType, errorMessage: String) {
         if (match(type)) {
+            if (debug) println("now consuming: $type ${getCurrentToken().text}")
             advance()
-            if (debug) println("now consuming: $type")
         } else {
             throw ParseException("On line " + getCurrentToken().line + ", Column "
                     + getCurrentToken().column + " "

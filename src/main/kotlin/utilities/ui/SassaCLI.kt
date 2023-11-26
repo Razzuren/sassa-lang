@@ -1,11 +1,13 @@
 package utilities.ui
 
+import SassaSemantical
 import utilities.parsers.*
 import java.io.File
 
 const val red = "\u001b[31m"
 const val reset = "\u001b[0m"
-const val debug = false
+const val debug = true
+var fileCompiledName:String = "SassaCompiled"
 
 fun main(args: Array<String>) {
     when {
@@ -103,25 +105,50 @@ private fun parseAndDisplayTokens(sourceCode: String) {
 
         }
     }
+
+
+    // Parse the tokens
+    val semantic = SassaSemantical(debug)
+    val generatedResult = semantic.analyze(parsedStatements)
+
+    println("Generated Code:\n $generatedResult")
+
+    saveFile(generatedResult)
+
+}
+
+private fun saveFile(content: String) {
+    println("Enter the file path to save the string:")
+    val filePath = readln()
+    try {
+        val file = File(filePath)
+        file.writeText(content)
+        println("File saved successfully at: $filePath")
+    } catch (e: Exception) {
+        println("Error saving the file: ${e.message}")
+    }
 }
 
 private fun testPredefinedString() {
     val sourceCode = """
         /* this is a comment */
         str test(str argument, num argument2){
+            str argument3 = 'noway'
             out(argument) /* this is a comment */
             out(argument2)
             return 'hello'
         }
-        
         main {
             num x = 5
             if (x == 5) {
                 num y = 7.2 % 2
             } else {
                 loop ( num z = 0 .. 9) {
-                    /*this is also a comment*/ str y = 'its dangerous'
-                    test( y , z)
+                    num a = 7.2 % 2
+                    /*this is also a comment*/ str z = 'its dangerous'
+                    test( z , a)
+                    z = test(z, 2.5)
+                    a = in(a)
                 }
             }
         }

@@ -31,10 +31,11 @@ sealed class TokenType {
     object Comma : TokenType()
     object NewLine : TokenType()
     object Invalid : TokenType()
+
 }
 
 // Define the utilities.parsers.Token class with line and column information
-data class Token(val type: TokenType, val text: String, val line: Int, val column: Int)
+data class Token(val type: TokenType, var text: String, val line: Int, val column: Int)
 
 //I know this code is ugly as hell, I will refactor in the near future
 //TODO() Refactor lexemes to be interpreted by it own method
