@@ -1,0 +1,17 @@
+/* this is a comment */
+str test(str argument, num argument2){
+    out(argument)
+    out(argument2)
+}
+
+main {
+    num x = 5
+    if (x == 5) {
+        num y = 7.2 % 2
+    } else {
+        loop ( num z = 0 .. 9) {
+            str y = 'its dangerous'
+            test( y , z)
+        }
+    }
+}
